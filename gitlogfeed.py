@@ -203,7 +203,7 @@ class Feed:
             entry,
             "link",
             href=f"{self.base_url}/{filename}",
-            type="alternate",
+            rel="alternate",
         )
 
     def write(self):
