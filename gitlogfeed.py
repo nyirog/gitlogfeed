@@ -3,6 +3,7 @@ import tempfile
 import datetime
 import argparse
 import sys
+import enum
 
 import xml.etree.ElementTree as ET
 
@@ -123,6 +124,39 @@ class Git:
         return result.stdout.decode("utf-8")
 
 
+class Color(str, enum.Enum):
+    WHITE = "white"
+    GREY = "lightgrey"
+    BLUE = "lightblue"
+    GREEN = "lightgreen"
+    RED = "pink"
+
+
+class DiffScope:
+    def __init__(self):
+        self._in_header = False
+
+    def select_color(self, line) -> Color:
+        if self._in_header:
+            return Color.GREY
+
+        if line.startswith("diff "):
+            self._in_header = True
+            return Color.BLUE
+
+        if line.startswith("+"):
+            return Color.GREEN
+
+        if line.startswith("-"):
+            return Color.RED
+
+        return Color.WHITE
+
+    def check_scope(self, line):
+        if self._in_header and line.startswith("@@ "):
+            self._in_header = False
+
+
 class Html:
     def __init__(self, title):
         self.doc = ET.Element("html")
@@ -131,31 +165,13 @@ class Html:
         self.body = _add_child(self.doc, "body")
 
     def parse_diff(self, file_desc):
-        div = _add_child(self.doc, "pre")
+        pre = _add_child(self.doc, "pre")
+        diff_scope = DiffScope()
+
         for line in file_desc:
-            span = _add_child(div, "span", **self._select_attrs(line))
-            span.text = line
-
-    @staticmethod
-    def _select_attrs(line):
-        if line.startswith("+ "):
-            return {"style": "background-color:lightgreen"}
-
-        if line.startswith("- "):
-            return {"style": "background-color:pink"}
-
-        if line.startswith("diff "):
-            return {"style": "background-color:lightblue"}
-
-        if (
-            line.startswith("index ")
-            or line.startswith("+++ ")
-            or line.startswith("--- ")
-            or line.startswith("@@ ")
-        ):
-            return {"style": "background-color:lightgrey"}
-
-        return {}
+            bg_color = diff_scope.select_color(line)
+            _add_child(pre, "span", text=line, style=f"background-color:{bg_color}")
+            diff_scope.check_scope(line)
 
     def write(self, filename):
         tree = ET.ElementTree(self.doc)
