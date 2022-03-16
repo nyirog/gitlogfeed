@@ -12,7 +12,7 @@ dev: $(DEV_BUILD_FLAG)
 
 $(DEV_BUILD_FLAG):
 	python -m venv .venv
-	.venv/bin/pip install black==22.1.0 pylint
+	.venv/bin/pip install black==22.1.0 pylint pytest
 	touch $(DEV_BUILD_FLAG)
 
 clean:
@@ -32,3 +32,6 @@ lint: $(DEV_BUILD_FLAG)
 		--disable too-few-public-methods \
 		$(LINT_PATH)
 
+
+test: $(DEV_BUILD_FLAG)
+	.venv/bin/py.test tests
