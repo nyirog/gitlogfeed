@@ -1,6 +1,11 @@
 import subprocess
+import pathlib
+import xml.etree.ElementTree as ET
 
-from gitlogfeed import Git
+from gitlogfeed import Git, Html
+
+
+ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
 
 
 def test_git_show(tmpdir):
@@ -58,6 +63,27 @@ def test_git_log_limit(tmpdir):
     assert git.log(1, "%s", list) == ["second commit"]
 
 
+def test_html(tmpdir):
+    repo = tmpdir.mkdir("repo")
+
+    with repo.as_cwd():
+        subprocess.check_call(["git", "init"])
+        _git_init()
+        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
+        _git_commit(repo, "second commit", {"foo.py": "print(24)"})
+
+    html = Html("Test title")
+    git = Git(str(repo), None, 20)
+    git.show("HEAD", "", html.parse_diff)
+
+    html_file = tmpdir.join("diff.html")
+    html.write(str(html_file))
+
+    test_asset = ASSETS.joinpath("diff.html")
+
+    assert _canonicalize_xml(html_file) == _canonicalize_xml(test_asset)
+
+
 def _git_init():
     subprocess.check_call(["git", "init"])
 
@@ -68,3 +94,7 @@ def _git_commit(repo, message, files):
         subprocess.check_call(["git", "add", filename])
 
     subprocess.check_call(["git", "commit", "-m", message])
+
+
+def _canonicalize_xml(from_file):
+    return ET.canonicalize(from_file=str(from_file))
