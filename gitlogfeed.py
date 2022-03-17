@@ -8,16 +8,28 @@ import enum
 import xml.etree.ElementTree as ET
 
 
-def main():
-    args = _parse_args()
+def main(argv=None):
+    arg_parser = _create_arg_parser()
+    args = arg_parser.parse_args(argv)
+
     git = Git(args.repo, args.filter_path, args.diff_context)
     feed = Feed(git, args.feed_title, args.base_url, args.feed_name)
-    app = App(git, feed, args.log_limit)
+    commits = git.log(args.log_limit)
 
-    return app.main()
+    try:
+        update = commits[0]["date"]
+    except IndexError:
+        update = datetime.datetime.now().isformat()
+
+    feed.update(update)
+
+    for commit in commits:
+        feed.add_entry(commit)
+
+    feed.write()
 
 
-def _parse_args():
+def _create_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=".")
     parser.add_argument("--filter-path")
@@ -27,7 +39,7 @@ def _parse_args():
     parser.add_argument("--feed-name", default="atom.xml")
     parser.add_argument("--feed-title", default="Git log feed")
 
-    return parser.parse_args()
+    return parser
 
 
 class App:
