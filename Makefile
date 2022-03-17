@@ -1,12 +1,12 @@
 .PHONY: install test dev clean doc check check-format format lint
 
 DEV_BUILD_FLAG = .venv/DEV_BUILD_FLAG
-LINT_PATH = gitlogfeed.py
+LINT_PATH = gitlogfeed.py tests
 
 install:
 	python3 setup.py install
 
-check: check-format lint
+check: check-format lint test
 
 dev: $(DEV_BUILD_FLAG)
 
