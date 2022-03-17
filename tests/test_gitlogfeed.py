@@ -44,6 +44,20 @@ def test_git_log_filter(tmpdir):
     assert git.log(2, "%s", list) == ["python commit"]
 
 
+def test_git_log_limit(tmpdir):
+    repo = tmpdir.mkdir("repo")
+
+    with repo.as_cwd():
+        subprocess.check_call(["git", "init"])
+        _git_init()
+        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
+        _git_commit(repo, "second commit", {"foo.py": "print(24)"})
+
+    git = Git(str(repo), None, 20)
+
+    assert git.log(1, "%s", list) == ["second commit"]
+
+
 def _git_init():
     subprocess.check_call(["git", "init"])
 
