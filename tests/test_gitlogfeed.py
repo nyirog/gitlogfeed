@@ -8,7 +8,7 @@ from gitlogfeed import Git, Html
 ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
 
 
-def test_git_show(tmpdir):
+def test_git_show_patch(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
@@ -16,9 +16,9 @@ def test_git_show(tmpdir):
         _git_commit(repo, "commit title\n\ncommit message", {"foo.py": "print(42)"})
 
     git = Git(str(repo), None, 20)
+    test_asset = ASSETS.joinpath("patch.diff").read_text()
 
-    assert git.show("HEAD", "%s") == "commit title"
-    assert git.show("HEAD", "%b") == "commit message\n"
+    assert git.show_patch("HEAD", lambda file_desc: "".join(file_desc)) == test_asset
 
 
 def test_git_log(tmpdir):
@@ -31,8 +31,22 @@ def test_git_log(tmpdir):
         _git_commit(repo, "second commit", {"foo.py": "print(24)"})
 
     git = Git(str(repo), None, 20)
+    log = [
+        {
+            "title": "second commit",
+            "name": "test",
+            "email": "test@github.com",
+            "message": "",
+        },
+        {
+            "title": "first commit",
+            "name": "test",
+            "email": "test@github.com",
+            "message": "",
+        },
+    ]
 
-    assert git.log(2, "%s", list) == ["second commit\n", "first commit"]
+    assert _filter_commits(git.log(2), {"title", "name", "email", "message"}) == log
 
 
 def test_git_log_filter(tmpdir):
@@ -45,8 +59,11 @@ def test_git_log_filter(tmpdir):
         _git_commit(repo, "php commit", {"foo.php": "echo 42;"})
 
     git = Git(str(repo), "*.py", 20)
+    log = [
+        {"title": "python commit"},
+    ]
 
-    assert git.log(2, "%s", list) == ["python commit"]
+    assert _filter_commits(git.log(2), {"title"}) == log
 
 
 def test_git_log_limit(tmpdir):
@@ -59,8 +76,11 @@ def test_git_log_limit(tmpdir):
         _git_commit(repo, "second commit", {"foo.py": "print(24)"})
 
     git = Git(str(repo), None, 20)
+    log = [
+        {"title": "second commit"},
+    ]
 
-    assert git.log(1, "%s", list) == ["second commit"]
+    assert _filter_commits(git.log(1), {"title"}) == log
 
 
 def test_html(tmpdir):
@@ -74,7 +94,7 @@ def test_html(tmpdir):
 
     html = Html("Test title")
     git = Git(str(repo), None, 20)
-    git.show("HEAD", "", html.parse_diff)
+    git.show_patch("HEAD", html.parse_diff)
 
     html_file = tmpdir.join("diff.html")
     html.write(str(html_file))
@@ -100,3 +120,10 @@ def _git_commit(repo, message, files):
 
 def _canonicalize_xml(from_file):
     return ET.canonicalize(from_file=str(from_file))
+
+
+def _filter_commits(commits, required):
+    return [
+        {key: value for key, value in commit.items() if key in required}
+        for commit in commits
+    ]

@@ -37,7 +37,7 @@ class App:
         self._log_limit = log_limit
 
     def main(self):
-        commits = self._git.log(self._log_limit, "%H", self._list_commits)
+        commits = self._git.log(self._log_limit)
 
         try:
             update = commits[0]["date"]
@@ -51,18 +51,6 @@ class App:
 
         self._feed.write()
 
-    def _list_commits(self, file_desc):
-        return [self._get_commit(line.strip()) for line in file_desc]
-
-    def _get_commit(self, commit):
-        info = self._git.show(
-            commit, "title,%s%ndate,%aI%nname,%an%nemail,%ae", _parse_commit_info
-        )
-        info["commit"] = commit
-        info["message"] = self._git.show(commit, "%b")
-
-        return info
-
 
 def _parse_commit_info(file_desc):
     return dict(line.strip().split(",", maxsplit=1) for line in file_desc)
@@ -74,7 +62,22 @@ class Git:
         self._filter_path = filter_path
         self._diff_context = diff_context
 
-    def log(self, max_count, commit_format, processor=None):
+    def log(self, max_count):
+        return self._log(max_count, "%H", self._list_commits)
+
+    def _list_commits(self, file_desc):
+        return [self._get_commit(line.strip()) for line in file_desc]
+
+    def _get_commit(self, commit):
+        info = self._show(
+            commit, "title,%s%ndate,%aI%nname,%an%nemail,%ae", _parse_commit_info
+        )
+        info["commit"] = commit
+        info["message"] = self._show(commit, "%b")
+
+        return info
+
+    def _log(self, max_count, commit_format, processor=None):
         args = [
             "git",
             "log",
@@ -90,7 +93,10 @@ class Git:
 
         return self._run(args)
 
-    def show(self, commit, commit_format, processor=None):
+    def show_patch(self, commit, processor):
+        return self._show(commit, "", processor)
+
+    def _show(self, commit, commit_format, processor=None):
         args = [
             "git",
             "show",
@@ -212,7 +218,7 @@ class Feed:
 
         filename = f"{commit_info['commit']}.html"
         html = Html(commit_info["title"])
-        self.git.show(commit_info["commit"], "", html.parse_diff)
+        self.git.show_patch(commit_info["commit"], html.parse_diff)
         html.write(filename)
 
         _add_child(
