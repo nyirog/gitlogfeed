@@ -61,42 +61,36 @@ class Git:
         self._repo = repo
         self._filter_path = filter_path
         self._diff_context = diff_context
+        self._sub_process = SubProcess(cwd=repo, encoding="utf-8")
+
+    def iter_patch_lines(self, commit):
+        yield from self._sub_process.pipe(self._get_show_args(commit, ""))
 
     def log(self, max_count):
-        return self._log(max_count, "%H", self._list_commits)
-
-    def _list_commits(self, file_desc):
-        return [self._get_commit(line.strip()) for line in file_desc]
-
-    def _get_commit(self, commit):
-        info = self._show(
-            commit, "title,%s%ndate,%aI%nname,%an%nemail,%ae", _parse_commit_info
-        )
-        info["commit"] = commit
-        info["message"] = self._show(commit, "%b")
-
-        return info
-
-    def _log(self, max_count, commit_format, processor=None):
         args = [
             "git",
             "log",
+            "--format=format:%H",
             f"--max-count={max_count}",
-            f"--format=format:{commit_format}",
         ]
 
         if self._filter_path:
             args.extend(["--", self._filter_path])
 
-        if callable(processor):
-            return self._pipe(args, processor)
+        return [self._get_commit(line.strip()) for line in self._sub_process.pipe(args)]
 
-        return self._run(args)
+    def _get_commit(self, commit):
+        args = self._get_show_args(commit, "title,%s%ndate,%aI%nname,%an%nemail,%ae")
+        info = dict(
+            line.strip().split(",", maxsplit=1) for line in self._sub_process.pipe(args)
+        )
 
-    def show_patch(self, commit, processor):
-        return self._show(commit, "", processor)
+        info["commit"] = commit
+        info["message"] = self._sub_process.call(self._get_show_args(commit, "%b"))
 
-    def _show(self, commit, commit_format, processor=None):
+        return info
+
+    def _get_show_args(self, commit, commit_format):
         args = [
             "git",
             "show",
@@ -110,24 +104,24 @@ class Git:
 
         args.append(commit)
 
-        if self._filter_path:
-            args.extend(["--", self._filter_path])
+        return args
 
-        if callable(processor):
-            return self._pipe(args, processor)
 
-        return self._run(args)
+class SubProcess:
+    def __init__(self, cwd=None, encoding="utf-8"):
+        self._cwd = cwd
+        self._encoding = encoding
 
-    def _pipe(self, args, processor):
+    def call(self, args):
+        result = subprocess.run(args, check=True, capture_output=True, cwd=self._cwd)
+        return result.stdout.decode("utf-8")
+
+    def pipe(self, args):
         with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as tmp:
-            with subprocess.Popen(args, stdout=tmp, cwd=self._repo) as proc:
+            with subprocess.Popen(args, stdout=tmp, cwd=self._cwd) as proc:
                 proc.communicate()
                 tmp.seek(0)
-                return processor(tmp)
-
-    def _run(self, args):
-        result = subprocess.run(args, check=True, capture_output=True, cwd=self._repo)
-        return result.stdout.decode("utf-8")
+                yield from tmp
 
 
 class Color(str, enum.Enum):
@@ -170,11 +164,11 @@ class Html:
         _add_child(self.doc, "title", text=title)
         self.body = _add_child(self.doc, "body")
 
-    def parse_diff(self, file_desc):
+    def parse_diff(self, diff_lines):
         pre = _add_child(self.doc, "pre")
         diff_scope = DiffScope()
 
-        for line in file_desc:
+        for line in diff_lines:
             bg_color = diff_scope.select_color(line)
             _add_child(pre, "span", text=line, style=f"background-color:{bg_color}")
             diff_scope.check_scope(line)
@@ -218,7 +212,7 @@ class Feed:
 
         filename = f"{commit_info['commit']}.html"
         html = Html(commit_info["title"])
-        self.git.show_patch(commit_info["commit"], html.parse_diff)
+        html.parse_diff(self.git.iter_patch_lines(commit_info["commit"]))
         html.write(filename)
 
         _add_child(

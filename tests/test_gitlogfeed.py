@@ -8,7 +8,7 @@ from gitlogfeed import Git, Html
 ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
 
 
-def test_git_show_patch(tmpdir):
+def test_git_iter_patch_lines(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
@@ -16,9 +16,9 @@ def test_git_show_patch(tmpdir):
         _git_commit(repo, "commit title\n\ncommit message", {"foo.py": "print(42)"})
 
     git = Git(str(repo), None, 20)
-    test_asset = ASSETS.joinpath("patch.diff").read_text()
+    test_asset = ASSETS.joinpath("patch.diff").read_text(encoding="ascii")
 
-    assert git.show_patch("HEAD", lambda file_desc: "".join(file_desc)) == test_asset
+    assert "".join(git.iter_patch_lines("HEAD")) == test_asset
 
 
 def test_git_log(tmpdir):
@@ -92,9 +92,9 @@ def test_html(tmpdir):
         _git_commit(repo, "first commit", {"foo.py": "print(42)"})
         _git_commit(repo, "second commit", {"foo.py": "print(24)"})
 
-    html = Html("Test title")
     git = Git(str(repo), None, 20)
-    git.show_patch("HEAD", html.parse_diff)
+    html = Html("Test title")
+    html.parse_diff(git.iter_patch_lines("HEAD"))
 
     html_file = tmpdir.join("diff.html")
     html.write(str(html_file))
