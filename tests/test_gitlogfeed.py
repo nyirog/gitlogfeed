@@ -86,6 +86,8 @@ def test_html(tmpdir):
 
 def _git_init():
     subprocess.check_call(["git", "init"])
+    subprocess.check_call(["git", "config", "--local", "user.name", "test"])
+    subprocess.check_call(["git", "config", "--local", "user.email", "test@github.com"])
 
 
 def _git_commit(repo, message, files):
