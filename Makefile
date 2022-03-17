@@ -12,6 +12,7 @@ dev: $(DEV_BUILD_FLAG)
 
 $(DEV_BUILD_FLAG):
 	python -m venv .venv
+	.venv/bin/pip install -e .
 	.venv/bin/pip install black==22.1.0 pylint pytest
 	touch $(DEV_BUILD_FLAG)
 
