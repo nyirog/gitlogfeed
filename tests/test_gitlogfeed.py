@@ -2,7 +2,7 @@ import subprocess
 import pathlib
 import xml.etree.ElementTree as ET
 
-from gitlogfeed import Git, Html
+from gitlogfeed import Git, Html, Feed
 
 
 ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
@@ -34,14 +34,14 @@ def test_git_log(tmpdir):
     log = [
         {
             "title": "second commit",
-            "name": "test",
-            "email": "test@github.com",
+            "name": "Test User",
+            "email": "test.user@github.com",
             "message": "",
         },
         {
             "title": "first commit",
-            "name": "test",
-            "email": "test@github.com",
+            "name": "Test User",
+            "email": "test.user@github.com",
             "message": "",
         },
     ]
@@ -104,10 +104,40 @@ def test_html(tmpdir):
     assert _canonicalize_xml(html_file) == _canonicalize_xml(test_asset)
 
 
+def test_feed(tmpdir):
+    repo = tmpdir.mkdir("repo")
+
+    with repo.as_cwd():
+        subprocess.check_call(["git", "init"])
+        _git_init()
+        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
+        _git_commit(repo, "second commit", {"foo.py": "print(24)"})
+
+    git = Git(str(repo), None, 20)
+    feed_name = "feed.atom.xml"
+    feed_title = "Feed title"
+    feed = Feed(git, feed_title, "https://feed-example.com", feed_name)
+    commits = git.log(2)
+
+    for commit in commits:
+        feed.add_entry(commit)
+
+    with tmpdir.as_cwd():
+        feed.write()
+
+    feed_xml = ET.parse(str(tmpdir.join(feed_name)))
+
+    assert _find_text(feed_xml, "title") == feed_title
+    assert _find_all_text(feed_xml, "entry/title") == ["second commit", "first commit"]
+    assert _find_all_text(feed_xml, "entry/author/name") == ["Test User", "Test User"]
+
+
 def _git_init():
     subprocess.check_call(["git", "init"])
-    subprocess.check_call(["git", "config", "--local", "user.name", "test"])
-    subprocess.check_call(["git", "config", "--local", "user.email", "test@github.com"])
+    subprocess.check_call(["git", "config", "--local", "user.name", "Test User"])
+    subprocess.check_call(
+        ["git", "config", "--local", "user.email", "test.user@github.com"]
+    )
 
 
 def _git_commit(repo, message, files):
@@ -127,3 +157,13 @@ def _filter_commits(commits, required):
         {key: value for key, value in commit.items() if key in required}
         for commit in commits
     ]
+
+
+def _find_text(root, tag):
+    namespaces = {"": "http://www.w3.org/2005/Atom"}
+    return root.find(tag, namespaces).text
+
+
+def _find_all_text(root, tag):
+    namespaces = {"": "http://www.w3.org/2005/Atom"}
+    return [node.text for node in root.findall(tag, namespaces)]
