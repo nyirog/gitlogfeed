@@ -116,14 +116,13 @@ def test_feed(tmpdir):
     git = Git(str(repo), None, 20)
     feed_name = "feed.atom.xml"
     feed_title = "Feed title"
-    feed = Feed(git, feed_title, "https://feed-example.com", feed_name)
+    feed = Feed(git, feed_title, "https://feed-example.com", feed_name, str(tmpdir))
     commits = git.log(2)
 
     for commit in commits:
         feed.add_entry(commit)
 
-    with tmpdir.as_cwd():
-        feed.write()
+    feed.write()
 
     feed_xml = ET.parse(str(tmpdir.join(feed_name)))
 

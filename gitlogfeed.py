@@ -13,7 +13,7 @@ def main(argv=None):
     args = arg_parser.parse_args(argv)
 
     git = Git(args.repo, args.filter_path, args.diff_context)
-    feed = Feed(git, args.feed_title, args.base_url, args.feed_name)
+    feed = Feed(git, args.feed_title, args.base_url, args.feed_name, args.target_dir)
     commits = git.log(args.log_limit)
 
     try:
@@ -36,6 +36,7 @@ def _create_arg_parser():
     parser.add_argument("--log-limit", type=int, default=20)
     parser.add_argument("--diff-context", type=int, default=5000)
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--target-dir", default=".")
     parser.add_argument("--feed-name", default="atom.xml")
     parser.add_argument("--feed-title", default="Git log feed")
 
@@ -194,10 +195,12 @@ class Html:
 
 
 class Feed:
-    def __init__(self, git, title, base_url, filename):
+    # pylint: disable=too-many-arguments
+    def __init__(self, git, title, base_url, filename, target_dir):
         self.filename = filename
         self.base_url = base_url
         self.git = git
+        self.target_dir = target_dir
 
         self.feed = ET.Element("feed", {"xmlns": "http://www.w3.org/2005/Atom"})
 
@@ -225,7 +228,7 @@ class Feed:
         filename = f"{commit_info['commit']}.html"
         html = Html(commit_info["title"])
         html.parse_diff(self.git.iter_patch_lines(commit_info["commit"]))
-        html.write(filename)
+        html.write(f"{self.target_dir}/{filename}")
 
         _add_child(
             entry,
@@ -236,7 +239,7 @@ class Feed:
 
     def write(self):
         tree = ET.ElementTree(self.feed)
-        tree.write(self.filename, xml_declaration=True)
+        tree.write(f"{self.target_dir}/{self.filename}", xml_declaration=True)
 
 
 def _add_child(parent, tag, text=None, **attrib):
