@@ -6,7 +6,7 @@ with open("README.md") as fp:
 
 setup(
     name="gitlogfeed",
-    version="0.1.1",
+    version="0.2.0",
     description="Create an atom feed from git log",
     long_description=long_description,
     long_description_content_type="text/markdown",
