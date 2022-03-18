@@ -7,7 +7,7 @@
 ## Installation
 
 ```sh
-pip install gitlibfeed
+pip install gitlogfeed
 ```
 
 ## When to use?
@@ -21,7 +21,7 @@ gitlogfeed --repo /path/of/your/git/repo --base-url https://your.site --filter-p
 ```
 
 The title and summary of the feed entry will be created from the commit
-message. `gitlogfeed` creates a html file from the patch and the content of the
+message. `gitlogfeed` creates an html file from the patch and the content of the
 feed entry will link to the html file.
 
 `gitlogfeed` uses quite high diff context limit (5000) so the feed entry will
