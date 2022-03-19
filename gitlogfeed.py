@@ -43,32 +43,6 @@ def _create_arg_parser():
     return parser
 
 
-class App:
-    def __init__(self, git, feed, log_limit):
-        self._git = git
-        self._feed = feed
-        self._log_limit = log_limit
-
-    def main(self):
-        commits = self._git.log(self._log_limit)
-
-        try:
-            update = commits[0]["date"]
-        except IndexError:
-            update = datetime.datetime.now().isformat()
-
-        self._feed.update(update)
-
-        for commit in commits:
-            self._feed.add_entry(commit)
-
-        self._feed.write()
-
-
-def _parse_commit_info(file_desc):
-    return dict(line.strip().split(",", maxsplit=1) for line in file_desc)
-
-
 class Git:
     def __init__(self, repo, filter_path, diff_context):
         self._repo = repo
