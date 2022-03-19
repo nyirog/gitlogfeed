@@ -6,6 +6,7 @@ from gitlogfeed import Git, Html, Feed, main
 
 
 ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
+NAMESPACES = {"": "http://www.w3.org/2005/Atom"}
 
 
 def test_git_iter_patch_lines(tmpdir):
@@ -110,13 +111,14 @@ def test_feed(tmpdir):
     with repo.as_cwd():
         subprocess.check_call(["git", "init"])
         _git_init()
-        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
-        _git_commit(repo, "second commit", {"foo.py": "print(24)"})
+        _git_commit(repo, "first-commit\n\nFirst message", {"foo.py": "print(42)"})
+        _git_commit(repo, "second-commit\n\nSecond message", {"foo.py": "print(24)"})
 
     git = Git(str(repo), None, 20)
     feed_name = "feed.atom.xml"
     feed_title = "Feed title"
-    feed = Feed(git, feed_title, "https://feed-example.com", feed_name, str(tmpdir))
+    base_url = "https://feed-example.com"
+    feed = Feed(git, feed_title, base_url, feed_name, str(tmpdir))
     commits = git.log(2)
 
     for commit in commits:
@@ -127,8 +129,29 @@ def test_feed(tmpdir):
     feed_xml = ET.parse(str(tmpdir.join(feed_name)))
 
     assert _find_text(feed_xml, "title") == feed_title
-    assert _find_all_text(feed_xml, "entry/title") == ["second commit", "first commit"]
-    assert _find_all_text(feed_xml, "entry/author/name") == ["Test User", "Test User"]
+    assert _find_text(feed_xml, "id") == base_url
+
+    entries = feed_xml.findall("entry", NAMESPACES)
+
+    assert len(entries) == len(commits)
+
+    for entry, commit in zip(entries, commits):
+        assert _find_text(entry, "title") == commit["title"]
+        assert _find_text(entry, "author/name") == commit["name"]
+        assert _find_text(entry, "author/email") == commit["email"]
+        assert _find_text(entry, "updated") == commit["date"]
+        assert _find_text(entry, "published") == commit["date"]
+        assert _find_text(entry, "summary/pre") == commit["message"]
+
+        link = entry.find("link", NAMESPACES).attrib["href"]
+        url, resource = link.rsplit("/", maxsplit=1)
+
+        assert url == base_url
+        assert resource == f"{commit['commit']}.html"
+
+        _assert_text_files(
+            ASSETS.joinpath(f"{commit['title']}.html"), tmpdir.join(resource)
+        )
 
 
 def test_main(tmpdir):
@@ -192,10 +215,12 @@ def _filter_commits(commits, required):
 
 
 def _find_text(root, tag):
-    namespaces = {"": "http://www.w3.org/2005/Atom"}
-    return root.find(tag, namespaces).text
+    return root.find(tag, NAMESPACES).text
 
 
 def _find_all_text(root, tag):
-    namespaces = {"": "http://www.w3.org/2005/Atom"}
-    return [node.text for node in root.findall(tag, namespaces)]
+    return [node.text for node in root.findall(tag, NAMESPACES)]
+
+
+def _assert_text_files(path_a, path_b, encoding="ascii"):
+    assert path_a.read_text(encoding) == path_b.read_text(encoding)
