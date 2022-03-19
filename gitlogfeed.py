@@ -1,3 +1,7 @@
+"""
+Create an atom feed from git log.
+"""
+
 import subprocess
 import tempfile
 import datetime
@@ -30,15 +34,56 @@ def main(argv=None):
 
 
 def _create_arg_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", default=".")
-    parser.add_argument("--filter-path")
-    parser.add_argument("--log-limit", type=int, default=20)
-    parser.add_argument("--diff-context", type=int, default=5000)
-    parser.add_argument("--base-url", required=True)
-    parser.add_argument("--target-dir", default=".")
-    parser.add_argument("--feed-name", default="atom.xml")
-    parser.add_argument("--feed-title", default="Git log feed")
+    parser = argparse.ArgumentParser(
+        description="Create an atom feed from git log.",
+        epilog="""
+        The title and summary of the feed entry will be created from the commit
+        message. An html file will be created from every patch and the content of the
+        feed entry will be linked to the html file.
+        """,
+    )
+    parser.add_argument(
+        "--repo",
+        default=".",
+        help="Path of the git repository, default is the current directory.",
+    )
+    parser.add_argument(
+        "--filter-path",
+        help="Narrow the commits which affects the specified FILTER_PATH.",
+    )
+    parser.add_argument(
+        "--log-limit",
+        type=int,
+        default=20,
+        help="Limit the number of commits to process, default is %(default)s.",
+    )
+    parser.add_argument(
+        "--diff-context",
+        type=int,
+        default=3,
+        help="Number of lines used in the diff, default is %(default)s.",
+    )
+    parser.add_argument(
+        "base_url",
+        help="The atom feed and the html diff files will be linked under this url. "
+        "This url will be used as the id of the feed.",
+    )
+    parser.add_argument(
+        "--target-dir",
+        default=".",
+        help="gitlogfeed will generate the files into this directory, "
+        "default is the current directory.",
+    )
+    parser.add_argument(
+        "--feed-name",
+        default="atom.xml",
+        help="Name of the feed file, default is '%(default)s'.",
+    )
+    parser.add_argument(
+        "--feed-title",
+        default="Git log feed",
+        help="Title of the feed, default is '%(default)s'.",
+    )
 
     return parser
 

@@ -164,11 +164,10 @@ def test_main(tmpdir):
 
     feed_name = "feed.atom.xml"
     feed_title = "Feed title"
+    base_url = "https://feed-example.com"
 
     main(
         [
-            "--base-url",
-            "https://feed-example.com",
             "--target-dir",
             str(tmpdir),
             "--repo",
@@ -177,12 +176,14 @@ def test_main(tmpdir):
             feed_name,
             "--feed-title",
             feed_title,
+            base_url,
         ]
     )
 
     feed_xml = ET.parse(str(tmpdir.join(feed_name)))
 
     assert _find_text(feed_xml, "title") == feed_title
+    assert _find_text(feed_xml, "id") == base_url
     assert _find_all_text(feed_xml, "entry/title") == ["first commit"]
     assert _find_all_text(feed_xml, "entry/author/name") == ["Test User"]
 
