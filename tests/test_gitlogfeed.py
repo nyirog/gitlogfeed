@@ -2,7 +2,7 @@ import subprocess
 import pathlib
 import xml.etree.ElementTree as ET
 
-from gitlogfeed import Git, Html, Feed
+from gitlogfeed import Git, Html, Feed, main
 
 
 ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
@@ -129,6 +129,39 @@ def test_feed(tmpdir):
     assert _find_text(feed_xml, "title") == feed_title
     assert _find_all_text(feed_xml, "entry/title") == ["second commit", "first commit"]
     assert _find_all_text(feed_xml, "entry/author/name") == ["Test User", "Test User"]
+
+
+def test_main(tmpdir):
+    repo = tmpdir.mkdir("repo")
+
+    with repo.as_cwd():
+        subprocess.check_call(["git", "init"])
+        _git_init()
+        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
+
+    feed_name = "feed.atom.xml"
+    feed_title = "Feed title"
+
+    main(
+        [
+            "--base-url",
+            "https://feed-example.com",
+            "--target-dir",
+            str(tmpdir),
+            "--repo",
+            str(repo),
+            "--feed-name",
+            feed_name,
+            "--feed-title",
+            feed_title,
+        ]
+    )
+
+    feed_xml = ET.parse(str(tmpdir.join(feed_name)))
+
+    assert _find_text(feed_xml, "title") == feed_title
+    assert _find_all_text(feed_xml, "entry/title") == ["first commit"]
+    assert _find_all_text(feed_xml, "entry/author/name") == ["Test User"]
 
 
 def _git_init():
