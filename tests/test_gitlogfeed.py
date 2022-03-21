@@ -26,7 +26,6 @@ def test_git_log(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
-        subprocess.check_call(["git", "init"])
         _git_init()
         _git_commit(repo, "first commit", {"foo.py": "print(42)"})
         _git_commit(repo, "second commit", {"foo.py": "print(24)"})
@@ -54,7 +53,6 @@ def test_git_log_filter(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
-        subprocess.check_call(["git", "init"])
         _git_init()
         _git_commit(repo, "python commit", {"foo.py": "print(42)"})
         _git_commit(repo, "php commit", {"foo.php": "echo 42;"})
@@ -71,7 +69,6 @@ def test_git_log_limit(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
-        subprocess.check_call(["git", "init"])
         _git_init()
         _git_commit(repo, "first commit", {"foo.py": "print(42)"})
         _git_commit(repo, "second commit", {"foo.py": "print(24)"})
@@ -88,7 +85,6 @@ def test_html(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
-        subprocess.check_call(["git", "init"])
         _git_init()
         _git_commit(repo, "first commit", {"foo.py": "print(42)"})
         _git_commit(repo, "second commit", {"foo.py": "print(24)"})
@@ -109,7 +105,6 @@ def test_feed(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
-        subprocess.check_call(["git", "init"])
         _git_init()
         _git_commit(repo, "first-commit\n\nFirst message", {"foo.py": "print(42)"})
         _git_commit(repo, "second-commit\n\nSecond message", {"foo.py": "print(24)"})
@@ -158,7 +153,6 @@ def test_main(tmpdir):
     repo = tmpdir.mkdir("repo")
 
     with repo.as_cwd():
-        subprocess.check_call(["git", "init"])
         _git_init()
         _git_commit(repo, "first commit", {"foo.py": "print(42)"})
 
