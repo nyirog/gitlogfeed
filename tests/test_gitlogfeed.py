@@ -101,6 +101,26 @@ def test_html(tmpdir):
     assert _canonicalize_xml(html_file) == _canonicalize_xml(test_asset)
 
 
+def test_filtered_diff_html(tmpdir):
+    repo = tmpdir.mkdir("repo")
+
+    with repo.as_cwd():
+        _git_init()
+        _git_commit(repo, "python commit", {"foo.py": "print(42)"})
+        _git_commit(repo, "php commit", {"foo.php": "echo 42;", "foo.py": "print(24)"})
+
+    git = Git(str(repo), "*.py", 20)
+    html = Html("Test title")
+    html.parse_diff(git.iter_patch_lines("HEAD"))
+
+    html_file = tmpdir.join("diff.html")
+    html.write(str(html_file))
+
+    test_asset = ASSETS.joinpath("diff.html")
+
+    assert _canonicalize_xml(html_file) == _canonicalize_xml(test_asset)
+
+
 def test_feed(tmpdir):
     repo = tmpdir.mkdir("repo")
 

@@ -99,15 +99,14 @@ class Git:
         yield from self._sub_process.pipe(self._get_show_args(commit, ""))
 
     def log(self, max_count):
-        args = [
-            "git",
-            "log",
-            "--format=format:%H",
-            f"--max-count={max_count}",
-        ]
-
-        if self._filter_path:
-            args.extend(["--", self._filter_path])
+        args = self._apply_filter_path(
+            [
+                "git",
+                "log",
+                "--format=format:%H",
+                f"--max-count={max_count}",
+            ]
+        )
 
         return [self._get_commit(line.strip()) for line in self._sub_process.pipe(args)]
 
@@ -135,6 +134,12 @@ class Git:
             args.append(f"--unified={self._diff_context}")
 
         args.append(commit)
+
+        return self._apply_filter_path(args)
+
+    def _apply_filter_path(self, args):
+        if self._filter_path:
+            args.extend(["--", self._filter_path])
 
         return args
 
