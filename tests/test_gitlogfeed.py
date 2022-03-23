@@ -2,171 +2,54 @@ import subprocess
 import pathlib
 import xml.etree.ElementTree as ET
 
-from gitlogfeed import Git, Html, Feed, main
+from gitlogfeed import Html, Feed, main, parse_git_log, iter_git_log
 
 
 ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
 NAMESPACES = {"": "http://www.w3.org/2005/Atom"}
 
 
-def test_git_iter_patch_lines(tmpdir):
-    repo = tmpdir.mkdir("repo")
-
-    with repo.as_cwd():
-        _git_init()
-        _git_commit(repo, "commit title\n\ncommit message", {"foo.py": "print(42)"})
-
-    git = Git(str(repo), None, 20)
-    test_asset = ASSETS.joinpath("patch.diff").read_text(encoding="ascii")
-
-    assert "".join(git.iter_patch_lines("HEAD")) == test_asset
-
-
-def test_git_log(tmpdir):
-    repo = tmpdir.mkdir("repo")
-
-    with repo.as_cwd():
-        _git_init()
-        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
-        _git_commit(repo, "second commit", {"foo.py": "print(24)"})
-
-    git = Git(str(repo), None, 20)
-    log = [
-        {
-            "title": "second commit",
-            "name": "Test User",
-            "email": "test.user@github.com",
-            "message": "",
-        },
-        {
-            "title": "first commit",
-            "name": "Test User",
-            "email": "test.user@github.com",
-            "message": "",
-        },
-    ]
-
-    assert _filter_commits(git.log(2), {"title", "name", "email", "message"}) == log
-
-
-def test_git_log_filter(tmpdir):
-    repo = tmpdir.mkdir("repo")
-
-    with repo.as_cwd():
-        _git_init()
-        _git_commit(repo, "python commit", {"foo.py": "print(42)"})
-        _git_commit(repo, "php commit", {"foo.php": "echo 42;"})
-
-    git = Git(str(repo), "*.py", 20)
-    log = [
-        {"title": "python commit"},
-    ]
-
-    assert _filter_commits(git.log(2), {"title"}) == log
-
-
-def test_git_log_limit(tmpdir):
-    repo = tmpdir.mkdir("repo")
-
-    with repo.as_cwd():
-        _git_init()
-        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
-        _git_commit(repo, "second commit", {"foo.py": "print(24)"})
-
-    git = Git(str(repo), None, 20)
-    log = [
-        {"title": "second commit"},
-    ]
-
-    assert _filter_commits(git.log(1), {"title"}) == log
-
-
 def test_html(tmpdir):
-    repo = tmpdir.mkdir("repo")
-
-    with repo.as_cwd():
-        _git_init()
-        _git_commit(repo, "first commit", {"foo.py": "print(42)"})
-        _git_commit(repo, "second commit", {"foo.py": "print(24)"})
-
-    git = Git(str(repo), None, 20)
-    html = Html("Test title")
-    html.parse_diff(git.iter_patch_lines("HEAD"))
+    commit = next(parse_git_log(ASSETS.joinpath("feed-git.log").open(encoding="ascii")))
+    html = Html()
+    html.parse_commit(commit)
 
     html_file = tmpdir.join("diff.html")
     html.write(str(html_file))
 
-    test_asset = ASSETS.joinpath("diff.html")
+    test_asset = ASSETS.joinpath("patch.html")
 
     assert _canonicalize_xml(html_file) == _canonicalize_xml(test_asset)
 
 
-def test_filtered_diff_html(tmpdir):
-    repo = tmpdir.mkdir("repo")
-
-    with repo.as_cwd():
-        _git_init()
-        _git_commit(repo, "python commit", {"foo.py": "print(42)"})
-        _git_commit(repo, "php commit", {"foo.php": "echo 42;", "foo.py": "print(24)"})
-
-    git = Git(str(repo), "*.py", 20)
-    html = Html("Test title")
-    html.parse_diff(git.iter_patch_lines("HEAD"))
-
-    html_file = tmpdir.join("diff.html")
-    html.write(str(html_file))
-
-    test_asset = ASSETS.joinpath("diff.html")
-
-    assert _canonicalize_xml(html_file) == _canonicalize_xml(test_asset)
-
-
-def test_feed(tmpdir):
-    repo = tmpdir.mkdir("repo")
-
-    with repo.as_cwd():
-        _git_init()
-        _git_commit(repo, "first-commit\n\nFirst message", {"foo.py": "print(42)"})
-        _git_commit(repo, "second-commit\n\nSecond message", {"foo.py": "print(24)"})
-
-    git = Git(str(repo), None, 20)
+def test_feed():
     feed_name = "feed.atom.xml"
     feed_title = "Feed title"
     base_url = "https://feed-example.com"
-    feed = Feed(git, feed_title, base_url, feed_name, str(tmpdir))
-    commits = git.log(2)
+    feed = Feed(feed_title, base_url, feed_name)
+    commits = list(
+        parse_git_log(ASSETS.joinpath("feed-git.log").open(encoding="ascii"))
+    )
 
     for commit in commits:
-        feed.add_entry(commit)
+        entry = feed.add_entry(commit)
+        feed.add_entry_link(entry, f"{commit['hash']}.html")
 
-    feed.write()
+    assert feed.feed.find("title").text == feed_title
+    assert feed.feed.find("id").text == base_url
 
-    feed_xml = ET.parse(str(tmpdir.join(feed_name)))
-
-    assert _find_text(feed_xml, "title") == feed_title
-    assert _find_text(feed_xml, "id") == base_url
-
-    entries = feed_xml.findall("entry", NAMESPACES)
+    entries = feed.feed.findall("entry")
 
     assert len(entries) == len(commits)
 
     for entry, commit in zip(entries, commits):
-        assert _find_text(entry, "title") == commit["title"]
-        assert _find_text(entry, "author/name") == commit["name"]
-        assert _find_text(entry, "author/email") == commit["email"]
-        assert _find_text(entry, "updated") == commit["date"]
-        assert _find_text(entry, "published") == commit["date"]
-        assert _find_text(entry, "summary/pre") == commit["message"]
-
-        link = entry.find("link", NAMESPACES).attrib["href"]
-        url, resource = link.rsplit("/", maxsplit=1)
-
-        assert url == base_url
-        assert resource == f"{commit['commit']}.html"
-
-        _assert_text_files(
-            ASSETS.joinpath(f"{commit['title']}.html"), tmpdir.join(resource)
-        )
+        assert entry.find("title").text == commit["title"]
+        assert entry.find("author/name").text == commit["name"]
+        assert entry.find("author/email").text == commit["email"]
+        assert entry.find("updated").text == commit["date"]
+        assert entry.find("published").text == commit["date"]
+        assert entry.find("summary/pre").text == "".join(commit["message"])
+        assert entry.find("link").attrib["href"] == f"{base_url}/{commit['hash']}.html"
 
 
 def test_main(tmpdir):
@@ -200,6 +83,61 @@ def test_main(tmpdir):
     assert _find_text(feed_xml, "id") == base_url
     assert _find_all_text(feed_xml, "entry/title") == ["first commit"]
     assert _find_all_text(feed_xml, "entry/author/name") == ["Test User"]
+
+
+def test_parse():
+    git_log_path = ASSETS.joinpath("git.log")
+    commits = list(parse_git_log(git_log_path.open(encoding="ascii")))
+
+    assert commits == [
+        {
+            "title": "setup.py: version 1.0.0",
+            "hash": "17a5555072179a6c50c39979787921205e67e1a6",
+            "date": "2022-03-19T22:38:46+01:00",
+            "email": "gergo@nyiro.name",
+            "name": "Gergo Nyiro",
+            "message": [],
+            "patch": _filter_lines(git_log_path.open(encoding="ascii"), 7, 19),
+        },
+        {
+            "title": "gitlogfeed cli: use base_url as positional argument",
+            "hash": "bda6a7e93152d5998d05ba8d512c2c4972bce889",
+            "date": "2022-03-19T22:22:35+01:00",
+            "email": "john@mail.com",
+            "name": "John Doe",
+            "message": ["Add help to the cli options.\n"],
+            "patch": _filter_lines(git_log_path.open(encoding="ascii"), 29, 165),
+        },
+    ]
+
+
+def test_parse_from_git(tmpdir):
+    repo = tmpdir.mkdir("repo")
+
+    with repo.as_cwd():
+        _git_init()
+        _git_commit(repo, "first commit\n\nFirst\n- message", {"foo.py": "print(42)"})
+        _git_commit(repo, "second commit\n\nSecond\n- message", {"foo.py": "print(24)"})
+
+    git_log = iter_git_log(str(repo), 2, 3, None)
+    commits = list(parse_git_log(git_log))
+
+    log = [
+        {
+            "title": "second commit",
+            "name": "Test User",
+            "email": "test.user@github.com",
+            "message": ["Second\n", "- message\n"],
+        },
+        {
+            "title": "first commit",
+            "name": "Test User",
+            "email": "test.user@github.com",
+            "message": ["First\n", "- message\n"],
+        },
+    ]
+
+    assert _filter_commits(commits, {"title", "name", "email", "message"}) == log
 
 
 def _git_init():
@@ -237,5 +175,5 @@ def _find_all_text(root, tag):
     return [node.text for node in root.findall(tag, NAMESPACES)]
 
 
-def _assert_text_files(path_a, path_b, encoding="ascii"):
-    assert path_a.read_text(encoding) == path_b.read_text(encoding)
+def _filter_lines(file_desc, start, end):
+    return [line for i, line in enumerate(file_desc, 1) if start <= i <= end]

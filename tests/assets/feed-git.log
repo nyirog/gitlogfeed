@@ -1,0 +1,31 @@
+commit 5932497bc6bc01c690cd9f6f7ea2ee6f3d39128f
+Author: John <john@mail>
+Date:   Wed Mar 23 08:13:39 2022 +0100
+
+    second-commit
+    
+    Second message
+
+diff --git a/foo.py b/foo.py
+index 517b47d..fd4462c 100644
+--- a/foo.py
++++ b/foo.py
+@@ -1 +1 @@
+-print(42)
++print(24)
+
+commit c9e0436fb63934cda3ac27d36a1016145460695c
+Author: Lucy <lucy@mail>
+Date:   Wed Mar 23 08:12:59 2022 +0100
+
+    first-commit
+    
+    First message
+
+diff --git a/foo.py b/foo.py
+new file mode 100644
+index 0000000..517b47d
+--- /dev/null
++++ b/foo.py
+@@ -0,0 +1 @@
++print(42)
