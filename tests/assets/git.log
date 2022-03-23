@@ -1,0 +1,165 @@
+commit 17a5555072179a6c50c39979787921205e67e1a6
+Author: Gergo Nyiro <gergo@nyiro.name>
+Date:   2022-03-19T22:38:46+01:00
+
+    setup.py: version 1.0.0
+
+diff --git a/setup.py b/setup.py
+index 0d47787..7ebcbfd 100644
+--- a/setup.py
++++ b/setup.py
+@@ -6,7 +6,7 @@ with open("README.md") as fp:
+ 
+ setup(
+     name="gitlogfeed",
+-    version="0.2.0",
++    version="1.0.0",
+     description="Create an atom feed from git log",
+     long_description=long_description,
+     long_description_content_type="text/markdown",
+
+commit bda6a7e93152d5998d05ba8d512c2c4972bce889
+Author: John Doe <john@mail.com>
+Date:   2022-03-19T22:22:35+01:00
+
+    gitlogfeed cli: use base_url as positional argument
+    
+    Add help to the cli options.
+
+diff --git a/README.md b/README.md
+index 0d7d910..4ab444d 100644
+--- a/README.md
++++ b/README.md
+@@ -17,17 +17,16 @@ gherkin) you can setup an atom feed with `gitlogfeed` to notify your users
+ about the changes of your project:
+ 
+ ```sh
+-gitlogfeed --repo /path/of/your/git/repo --base-url https://your.site --filter-path docs
++gitlogfeed --repo /path/of/your/git/repo --filter-path docs https://your.site
+ ```
+ 
+ The title and summary of the feed entry will be created from the commit
+-message. `gitlogfeed` creates an html file from the patch and the content of the
++message. `gitlogfeed` creates html file from every patch and the content of the
+ feed entry will link to the html file.
+ 
+-`gitlogfeed` uses quite high diff context limit (5000) so the feed entry will
+-contain the whole files not just the changes. You can change the context limit
+-with `--diff-limit` option:
++The scope of the generated diff can be set with the `--diff-context` option.
++You can show the entire file with a big enough limit:
+ 
+ ```
+-gitlogfeed --base-url https://your.site --diff-context 10
++gitlogfeed --diff-context 5000 https://your.site
+ ```
+diff --git a/gitlogfeed.py b/gitlogfeed.py
+index 594a639..3c19983 100644
+--- a/gitlogfeed.py
++++ b/gitlogfeed.py
+@@ -1,3 +1,7 @@
++"""
++Create an atom feed from git log.
++"""
++
+ import subprocess
+ import tempfile
+ import datetime
+@@ -30,15 +34,56 @@ def main(argv=None):
+ 
+ 
+ def _create_arg_parser():
+-    parser = argparse.ArgumentParser()
+-    parser.add_argument("--repo", default=".")
+-    parser.add_argument("--filter-path")
+-    parser.add_argument("--log-limit", type=int, default=20)
+-    parser.add_argument("--diff-context", type=int, default=5000)
+-    parser.add_argument("--base-url", required=True)
+-    parser.add_argument("--target-dir", default=".")
+-    parser.add_argument("--feed-name", default="atom.xml")
+-    parser.add_argument("--feed-title", default="Git log feed")
++    parser = argparse.ArgumentParser(
++        description="Create an atom feed from git log.",
++        epilog="""
++        The title and summary of the feed entry will be created from the commit
++        message. An html file will be created from every patch and the content of the
++        feed entry will be linked to the html file.
++        """,
++    )
++    parser.add_argument(
++        "--repo",
++        default=".",
++        help="Path of the git repository, default is the current directory.",
++    )
++    parser.add_argument(
++        "--filter-path",
++        help="Narrow the commits which affects the specified FILTER_PATH.",
++    )
++    parser.add_argument(
++        "--log-limit",
++        type=int,
++        default=20,
++        help="Limit the number of commits to process, default is %(default)s.",
++    )
++    parser.add_argument(
++        "--diff-context",
++        type=int,
++        default=3,
++        help="Number of lines used in the diff, default is %(default)s.",
++    )
++    parser.add_argument(
++        "base_url",
++        help="The atom feed and the html diff files will be linked under this url. "
++        "This url will be used as the id of the feed.",
++    )
++    parser.add_argument(
++        "--target-dir",
++        default=".",
++        help="gitlogfeed will generate the files into this directory, "
++        "default is the current directory.",
++    )
++    parser.add_argument(
++        "--feed-name",
++        default="atom.xml",
++        help="Name of the feed file, default is '%(default)s'.",
++    )
++    parser.add_argument(
++        "--feed-title",
++        default="Git log feed",
++        help="Title of the feed, default is '%(default)s'.",
++    )
+ 
+     return parser
+ 
+diff --git a/tests/test_gitlogfeed.py b/tests/test_gitlogfeed.py
+index d460267..2faf7f5 100644
+--- a/tests/test_gitlogfeed.py
++++ b/tests/test_gitlogfeed.py
+@@ -164,11 +164,10 @@ def test_main(tmpdir):
+ 
+     feed_name = "feed.atom.xml"
+     feed_title = "Feed title"
++    base_url = "https://feed-example.com"
+ 
+     main(
+         [
+-            "--base-url",
+-            "https://feed-example.com",
+             "--target-dir",
+             str(tmpdir),
+             "--repo",
+@@ -177,12 +176,14 @@ def test_main(tmpdir):
+             feed_name,
+             "--feed-title",
+             feed_title,
++            base_url,
+         ]
+     )
+ 
+     feed_xml = ET.parse(str(tmpdir.join(feed_name)))
+ 
+     assert _find_text(feed_xml, "title") == feed_title
++    assert _find_text(feed_xml, "id") == base_url
+     assert _find_all_text(feed_xml, "entry/title") == ["first commit"]
+     assert _find_all_text(feed_xml, "entry/author/name") == ["Test User"]
+ 
