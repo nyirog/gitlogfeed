@@ -17,11 +17,16 @@ def main(argv=None):
     arg_parser = _create_arg_parser()
     args = arg_parser.parse_args(argv)
 
-    feed = Feed(args.feed_title, args.base_url, args.feed_name)
-    git_log = iter_git_log(
-        args.repo, args.log_limit, args.diff_context, args.filter_path
-    )
+    if args.stdin:
+        git_log = sys.stdin
+
+    else:
+        git_log = iter_git_log(
+            args.repo, args.log_limit, args.diff_context, args.filter_path
+        )
+
     commits = parse_git_log(git_log)
+    feed = Feed(args.feed_title, args.base_url, args.feed_name)
 
     try:
         commit = next(commits)
@@ -50,43 +55,50 @@ def _create_arg_parser():
         """,
     )
     parser.add_argument(
+        "-i", "--stdin", action="store_true", help="Read git log from stdin"
+    )
+
+    group = parser.add_argument_group("git")
+    group.add_argument(
         "--repo",
         default=".",
         help="Path of the git repository, default is the current directory.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--filter-path",
         help="Narrow the commits which affects the specified FILTER_PATH.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--log-limit",
         type=int,
         default=20,
         help="Limit the number of commits to process, default is %(default)s.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--diff-context",
         type=int,
         default=3,
         help="Number of lines used in the diff, default is %(default)s.",
     )
-    parser.add_argument(
+
+    group = parser.add_argument_group("feed")
+    group.add_argument(
         "base_url",
         help="The atom feed and the html diff files will be linked under this url. "
         "This url will be used as the id of the feed.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--target-dir",
         default=".",
         help="gitlogfeed will generate the files into this directory, "
         "default is the current directory.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--feed-name",
         default="atom.xml",
         help="Name of the feed file, default is '%(default)s'.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--feed-title",
         default="Git log feed",
         help="Title of the feed, default is '%(default)s'.",
@@ -333,4 +345,4 @@ class Commit(dict):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv))

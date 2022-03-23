@@ -2,6 +2,8 @@ import subprocess
 import pathlib
 import xml.etree.ElementTree as ET
 
+from unittest.mock import patch
+
 from gitlogfeed import Html, Feed, main, parse_git_log, iter_git_log
 
 
@@ -83,6 +85,32 @@ def test_main(tmpdir):
     assert _find_text(feed_xml, "id") == base_url
     assert _find_all_text(feed_xml, "entry/title") == ["first commit"]
     assert _find_all_text(feed_xml, "entry/author/name") == ["Test User"]
+
+
+def test_main_with_stdin(tmpdir):
+    feed_name = "feed.atom.xml"
+    feed_title = "Feed title"
+    base_url = "https://feed-example.com"
+
+    with patch("sys.stdin", new_callable=ASSETS.joinpath("feed-git.log").open):
+        main(
+            [
+                "-i",
+                "--target-dir",
+                str(tmpdir),
+                "--feed-name",
+                feed_name,
+                "--feed-title",
+                feed_title,
+                base_url,
+            ]
+        )
+
+    feed_xml = ET.parse(str(tmpdir.join(feed_name)))
+
+    assert _find_text(feed_xml, "title") == feed_title
+    assert _find_text(feed_xml, "id") == base_url
+    assert _find_all_text(feed_xml, "entry/title") == ["second-commit", "first-commit"]
 
 
 def test_parse():

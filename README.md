@@ -30,3 +30,9 @@ You can show the entire file with a big enough limit:
 ```
 gitlogfeed --diff-context 5000 https://your.site
 ```
+
+`gitlogfeed` can read the git log from stdin:
+
+```
+git log --max-count 20 | gitlogfeed -i --target-dir docs/build https://your.site
+```
