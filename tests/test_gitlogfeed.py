@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 
 from unittest.mock import patch
 
-from gitlogfeed import Html, Feed, main, parse_git_log, iter_git_log
+from gitlogfeed import Html, Feed, GitLogParser, main, iter_git_log
 
 
 ASSETS = pathlib.Path(__file__).parent.joinpath("assets")
@@ -12,7 +12,9 @@ NAMESPACES = {"": "http://www.w3.org/2005/Atom"}
 
 
 def test_html(tmpdir):
-    commit = next(parse_git_log(ASSETS.joinpath("feed-git.log").open(encoding="ascii")))
+    commit = next(
+        GitLogParser().parse(ASSETS.joinpath("feed-git.log").open(encoding="ascii"))
+    )
     html = Html()
     html.parse_commit(commit)
 
@@ -30,7 +32,7 @@ def test_feed():
     base_url = "https://feed-example.com"
     feed = Feed(feed_title, base_url, feed_name)
     commits = list(
-        parse_git_log(ASSETS.joinpath("feed-git.log").open(encoding="ascii"))
+        GitLogParser().parse(ASSETS.joinpath("feed-git.log").open(encoding="ascii"))
     )
 
     for commit in commits:
@@ -115,7 +117,7 @@ def test_main_with_stdin(tmpdir):
 
 def test_parse():
     git_log_path = ASSETS.joinpath("git.log")
-    commits = list(parse_git_log(git_log_path.open(encoding="ascii")))
+    commits = list(GitLogParser().parse(git_log_path.open(encoding="ascii")))
 
     assert commits == [
         {
@@ -148,7 +150,7 @@ def test_parse_from_git(tmpdir):
         _git_commit(repo, "second commit\n\nSecond\n- message", {"foo.py": "print(24)"})
 
     git_log = iter_git_log(str(repo), 2, 3, None)
-    commits = list(parse_git_log(git_log))
+    commits = list(GitLogParser().parse(git_log))
 
     log = [
         {
@@ -169,12 +171,16 @@ def test_parse_from_git(tmpdir):
 
 
 def test_parse_megre():
-    commit = next(parse_git_log(ASSETS.joinpath("merge.patch").open(encoding="utf-8")))
+    commit = next(
+        GitLogParser().parse(ASSETS.joinpath("merge.patch").open(encoding="utf-8"))
+    )
     assert commit["email"] == "gergo@nyiro.name"
 
 
 def test_parse_git_date():
-    commit = next(parse_git_log(ASSETS.joinpath("git-date.log").open(encoding="ascii")))
+    commit = next(
+        GitLogParser().parse(ASSETS.joinpath("git-date.log").open(encoding="ascii"))
+    )
     assert commit["date"] == "2022-03-19T22:38:46+01:00"
 
 

@@ -26,7 +26,7 @@ def main(argv=None):
             args.repo, args.log_limit, args.diff_context, args.filter_path
         )
 
-    commits = parse_git_log(git_log)
+    commits = GitLogParser().parse(git_log)
     feed = Feed(args.feed_title, args.base_url, args.feed_name)
 
     try:
@@ -240,14 +240,6 @@ def _add_child(parent, tag, text=None, **attrib):
     return child
 
 
-class LogState(enum.Enum):
-    INIT = enum.auto()
-    HEADER = enum.auto()
-    TITLE = enum.auto()
-    MESSAGE = enum.auto()
-    PATCH = enum.auto()
-
-
 COMMIT_PATTERN = re.compile(r"^commit\s+([a-f0-9]{40})")
 AUTHOR_PATTERN = re.compile(r"^Author:\s+(.+)\s+<(.+)>")
 DATE_PATTERN = re.compile(r"^Date:\s+(.+)$")
@@ -256,82 +248,80 @@ MESSAGE_PATTERN = re.compile(r"^[ ]{4}(.*)")
 PATCH_PATTERN = re.compile(r"diff --git ")
 
 
-def parse_git_log(lines):
-    # pylint: disable=too-many-branches
-    # pylint: disable=too-many-statements
-    state = LogState.INIT
-    commit = {}
+class GitLogParser:
+    def __init__(self):
+        self._commit = {}
+        self._parse_line = self._parse_init
 
-    for line in lines:
-        if state == LogState.INIT:
-            if result := COMMIT_PATTERN.search(line):
-                if commit:
-                    yield commit
+    def parse(self, lines):
+        for line in lines:
+            if commit := self._parse_line(line):
+                yield commit
 
-                commit = Commit(result.group(1))
-                state = LogState.HEADER
+        if self._commit:
+            yield self._commit
 
-            elif result := PATCH_PATTERN.search(line):
-                state = LogState.PATCH
-                commit["patch"].append(line)
+    def _parse_init(self, line):
+        if result := COMMIT_PATTERN.search(line):
+            commit, self._commit = self._commit, Commit(result.group(1))
+            self._parse_line = self._parse_header
+            return commit
 
-            else:
-                warnings.warn(f"Unprocessed git log line: {line}")
+        if result := PATCH_PATTERN.search(line):
+            self._parse_line = self._parse_patch
+            self._commit["patch"].append(line)
+            return {}
 
-        elif state == LogState.HEADER:
-            if result := AUTHOR_PATTERN.search(line):
-                commit["name"] = result.group(1)
-                commit["email"] = result.group(2)
+        warnings.warn(f"Unprocessed git log line: {line}")
+        return {}
 
-            elif result := DATE_PATTERN.search(line):
-                commit["date"] = _parse_date(result.group(1))
+    def _parse_header(self, line):
+        if result := AUTHOR_PATTERN.search(line):
+            self._commit["name"] = result.group(1)
+            self._commit["email"] = result.group(2)
 
-            elif HEADER_PATTERN.search(line):
-                pass
+        elif result := DATE_PATTERN.search(line):
+            self._commit["date"] = _parse_date(result.group(1))
 
-            elif line == "\n":
-                state = LogState.TITLE
+        elif line == "\n":
+            self._parse_line = self._parse_title
 
-            else:
-                warnings.warn(f"Unprocessed git log line in header: {line}")
+        elif not HEADER_PATTERN.search(line):
+            warnings.warn(f"Unprocessed git log line in header: {line}")
 
-        elif state == LogState.TITLE:
-            if result := line.strip():
-                commit["title"] = result
+    def _parse_title(self, line):
+        if result := line.strip():
+            self._commit["title"] = result
 
-            else:
-                state = LogState.MESSAGE
+        else:
+            self._parse_line = self._parse_message
 
-        elif state == LogState.MESSAGE:
-            if MESSAGE_PATTERN.search(line):
-                commit["message"].append(line[4:])
+    def _parse_message(self, line):
+        if MESSAGE_PATTERN.search(line):
+            self._commit["message"].append(line[4:])
 
-            elif result := PATCH_PATTERN.search(line):
-                state = LogState.PATCH
-                commit["patch"].append(line)
+        elif PATCH_PATTERN.search(line):
+            self._parse_line = self._parse_patch
+            self._commit["patch"].append(line)
 
-            elif line == "\n":
-                state = LogState.INIT
+        elif line == "\n":
+            self._parse_line = self._parse_init
 
-            else:
-                warnings.warn(f"Unprocessed git log line in message: {line}")
+        else:
+            warnings.warn(f"Unprocessed git log line in message: {line}")
 
-        elif state == LogState.PATCH:
-            if result := COMMIT_PATTERN.search(line):
-                if commit:
-                    yield commit
+    def _parse_patch(self, line):
+        if result := COMMIT_PATTERN.search(line):
+            commit, self._commit = self._commit, Commit(result.group(1))
+            self._parse_line = self._parse_header
+            return commit
 
-                commit = Commit(result.group(1))
-                state = LogState.HEADER
+        if line == "\n":
+            self._parse_line = self._parse_init
+            return {}
 
-            elif line == "\n":
-                state = LogState.INIT
-
-            else:
-                commit["patch"].append(line)
-
-    if commit:
-        yield commit
+        self._commit["patch"].append(line)
+        return {}
 
 
 def _parse_date(date_str):
