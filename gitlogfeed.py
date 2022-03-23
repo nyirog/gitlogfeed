@@ -250,6 +250,7 @@ class LogState(enum.Enum):
 COMMIT_PATTERN = re.compile(r"^commit\s+([a-f0-9]{40})")
 AUTHOR_PATTERN = re.compile(r"^Author:\s+(.+)\s+<(.+)>")
 DATE_PATTERN = re.compile(r"^Date:\s+(.+)$")
+HEADER_PATTERN = re.compile(r"^\w+:\s+\S+")
 MESSAGE_PATTERN = re.compile(r"^[ ]{4}(.*)")
 PATCH_PATTERN = re.compile(r"diff --git ")
 
@@ -283,6 +284,9 @@ def parse_git_log(lines):
 
             elif result := DATE_PATTERN.search(line):
                 commit["date"] = _parse_date(result.group(1))
+
+            elif HEADER_PATTERN.search(line):
+                pass
 
             elif line == "\n":
                 state = LogState.TITLE
