@@ -9,6 +9,7 @@ import argparse
 import sys
 import enum
 import re
+import warnings
 
 import xml.etree.ElementTree as ET
 
@@ -275,7 +276,7 @@ def parse_git_log(lines):
                 commit["patch"].append(line)
 
             else:
-                raise ValueError(line)
+                warnings.warn(f"Unprocessed git log line: {line}")
 
         elif state == LogState.HEADER:
             if result := AUTHOR_PATTERN.search(line):
@@ -292,7 +293,7 @@ def parse_git_log(lines):
                 state = LogState.TITLE
 
             else:
-                raise ValueError(line)
+                warnings.warn(f"Unprocessed git log line in header: {line}")
 
         elif state == LogState.TITLE:
             if result := line.strip():
@@ -313,7 +314,7 @@ def parse_git_log(lines):
                 state = LogState.INIT
 
             else:
-                raise ValueError(line)
+                warnings.warn(f"Unprocessed git log line in message: {line}")
 
         elif state == LogState.PATCH:
             if result := COMMIT_PATTERN.search(line):
