@@ -140,6 +140,11 @@ def test_parse_from_git(tmpdir):
     assert _filter_commits(commits, {"title", "name", "email", "message"}) == log
 
 
+def test_parse_git_date():
+    commit = next(parse_git_log(ASSETS.joinpath("git-date.log").open(encoding="ascii")))
+    assert commit["date"] == "2022-03-19T22:38:46+01:00"
+
+
 def _git_init():
     subprocess.check_call(["git", "init"])
     subprocess.check_call(["git", "config", "--local", "user.name", "Test User"])

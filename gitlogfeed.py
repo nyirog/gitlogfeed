@@ -270,7 +270,7 @@ def parse_git_log(lines):
                 commit["email"] = result.group(2)
 
             elif result := DATE_PATTERN.search(line):
-                commit["date"] = result.group(1)
+                commit["date"] = _parse_date(result.group(1))
 
             elif line == "\n":
                 state = LogState.TITLE
@@ -315,6 +315,16 @@ def parse_git_log(lines):
 
     if commit:
         yield commit
+
+
+def _parse_date(date_str):
+    try:
+        date = datetime.datetime.strptime(date_str, "%a %b %d %H:%M:%S %Y %z")
+
+    except ValueError:
+        return date_str
+
+    return date.isoformat()
 
 
 class Commit(dict):
