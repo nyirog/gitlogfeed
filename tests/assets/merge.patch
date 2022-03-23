@@ -1,0 +1,9 @@
+commit ca8791232ec87413295892400a6a32bb383dd195
+Merge: c5713e0 3f9e2b7
+Author: Nyirő Gergő <gergo@nyiro.name>
+Date:   Wed Mar 23 18:47:17 2022 +0100
+
+    Merge pull request #1 from nyirog/dev
+    
+    gitlogfeed: parse_git_log
+

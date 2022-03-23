@@ -1,0 +1,19 @@
+commit 17a5555072179a6c50c39979787921205e67e1a6
+Author: Gergo Nyiro <gergo@nyiro.name>
+Date:   Sat Mar 19 22:38:46 2022 +0100
+
+    setup.py: version 1.0.0
+
+diff --git a/setup.py b/setup.py
+index 0d47787..7ebcbfd 100644
+--- a/setup.py
++++ b/setup.py
+@@ -6,7 +6,7 @@ with open("README.md") as fp:
+ 
+ setup(
+     name="gitlogfeed",
+-    version="0.2.0",
++    version="1.0.0",
+     description="Create an atom feed from git log",
+     long_description=long_description,
+     long_description_content_type="text/markdown",

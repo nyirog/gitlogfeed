@@ -9,6 +9,7 @@ import argparse
 import sys
 import enum
 import re
+import warnings
 
 import xml.etree.ElementTree as ET
 
@@ -17,11 +18,16 @@ def main(argv=None):
     arg_parser = _create_arg_parser()
     args = arg_parser.parse_args(argv)
 
-    feed = Feed(args.feed_title, args.base_url, args.feed_name)
-    git_log = iter_git_log(
-        args.repo, args.log_limit, args.diff_context, args.filter_path
-    )
+    if args.stdin:
+        git_log = sys.stdin
+
+    else:
+        git_log = iter_git_log(
+            args.repo, args.log_limit, args.diff_context, args.filter_path
+        )
+
     commits = parse_git_log(git_log)
+    feed = Feed(args.feed_title, args.base_url, args.feed_name)
 
     try:
         commit = next(commits)
@@ -50,43 +56,50 @@ def _create_arg_parser():
         """,
     )
     parser.add_argument(
+        "-i", "--stdin", action="store_true", help="Read git log from stdin"
+    )
+
+    group = parser.add_argument_group("git")
+    group.add_argument(
         "--repo",
         default=".",
         help="Path of the git repository, default is the current directory.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--filter-path",
         help="Narrow the commits which affects the specified FILTER_PATH.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--log-limit",
         type=int,
         default=20,
         help="Limit the number of commits to process, default is %(default)s.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--diff-context",
         type=int,
         default=3,
         help="Number of lines used in the diff, default is %(default)s.",
     )
-    parser.add_argument(
+
+    group = parser.add_argument_group("feed")
+    group.add_argument(
         "base_url",
         help="The atom feed and the html diff files will be linked under this url. "
         "This url will be used as the id of the feed.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--target-dir",
         default=".",
         help="gitlogfeed will generate the files into this directory, "
         "default is the current directory.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--feed-name",
         default="atom.xml",
         help="Name of the feed file, default is '%(default)s'.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--feed-title",
         default="Git log feed",
         help="Title of the feed, default is '%(default)s'.",
@@ -238,6 +251,7 @@ class LogState(enum.Enum):
 COMMIT_PATTERN = re.compile(r"^commit\s+([a-f0-9]{40})")
 AUTHOR_PATTERN = re.compile(r"^Author:\s+(.+)\s+<(.+)>")
 DATE_PATTERN = re.compile(r"^Date:\s+(.+)$")
+HEADER_PATTERN = re.compile(r"^\w+:\s+\S+")
 MESSAGE_PATTERN = re.compile(r"^[ ]{4}(.*)")
 PATCH_PATTERN = re.compile(r"diff --git ")
 
@@ -262,7 +276,7 @@ def parse_git_log(lines):
                 commit["patch"].append(line)
 
             else:
-                raise ValueError(line)
+                warnings.warn(f"Unprocessed git log line: {line}")
 
         elif state == LogState.HEADER:
             if result := AUTHOR_PATTERN.search(line):
@@ -270,13 +284,16 @@ def parse_git_log(lines):
                 commit["email"] = result.group(2)
 
             elif result := DATE_PATTERN.search(line):
-                commit["date"] = result.group(1)
+                commit["date"] = _parse_date(result.group(1))
+
+            elif HEADER_PATTERN.search(line):
+                pass
 
             elif line == "\n":
                 state = LogState.TITLE
 
             else:
-                raise ValueError(line)
+                warnings.warn(f"Unprocessed git log line in header: {line}")
 
         elif state == LogState.TITLE:
             if result := line.strip():
@@ -297,7 +314,7 @@ def parse_git_log(lines):
                 state = LogState.INIT
 
             else:
-                raise ValueError(line)
+                warnings.warn(f"Unprocessed git log line in message: {line}")
 
         elif state == LogState.PATCH:
             if result := COMMIT_PATTERN.search(line):
@@ -317,10 +334,20 @@ def parse_git_log(lines):
         yield commit
 
 
+def _parse_date(date_str):
+    try:
+        date = datetime.datetime.strptime(date_str, "%a %b %d %H:%M:%S %Y %z")
+
+    except ValueError:
+        return date_str
+
+    return date.isoformat()
+
+
 class Commit(dict):
     def __init__(self, commit_hash):
         super().__init__(hash=commit_hash, message=[], patch=[])
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv))

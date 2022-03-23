@@ -2,6 +2,8 @@ import subprocess
 import pathlib
 import xml.etree.ElementTree as ET
 
+from unittest.mock import patch
+
 from gitlogfeed import Html, Feed, main, parse_git_log, iter_git_log
 
 
@@ -85,6 +87,32 @@ def test_main(tmpdir):
     assert _find_all_text(feed_xml, "entry/author/name") == ["Test User"]
 
 
+def test_main_with_stdin(tmpdir):
+    feed_name = "feed.atom.xml"
+    feed_title = "Feed title"
+    base_url = "https://feed-example.com"
+
+    with patch("sys.stdin", new_callable=ASSETS.joinpath("feed-git.log").open):
+        main(
+            [
+                "-i",
+                "--target-dir",
+                str(tmpdir),
+                "--feed-name",
+                feed_name,
+                "--feed-title",
+                feed_title,
+                base_url,
+            ]
+        )
+
+    feed_xml = ET.parse(str(tmpdir.join(feed_name)))
+
+    assert _find_text(feed_xml, "title") == feed_title
+    assert _find_text(feed_xml, "id") == base_url
+    assert _find_all_text(feed_xml, "entry/title") == ["second-commit", "first-commit"]
+
+
 def test_parse():
     git_log_path = ASSETS.joinpath("git.log")
     commits = list(parse_git_log(git_log_path.open(encoding="ascii")))
@@ -138,6 +166,16 @@ def test_parse_from_git(tmpdir):
     ]
 
     assert _filter_commits(commits, {"title", "name", "email", "message"}) == log
+
+
+def test_parse_megre():
+    commit = next(parse_git_log(ASSETS.joinpath("merge.patch").open(encoding="utf-8")))
+    assert commit["email"] == "gergo@nyiro.name"
+
+
+def test_parse_git_date():
+    commit = next(parse_git_log(ASSETS.joinpath("git-date.log").open(encoding="ascii")))
+    assert commit["date"] == "2022-03-19T22:38:46+01:00"
 
 
 def _git_init():
